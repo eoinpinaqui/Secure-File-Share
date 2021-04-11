@@ -90,6 +90,9 @@
 </template>
 
 <script>
+import firebase from 'firebase';
+import db from '../firebase-init';
+import RSA from 'node-rsa';
 export default {
   name: 'Register',
 
@@ -105,10 +108,27 @@ export default {
   methods: {
     register() {
       if(this.password !== this.confirmPassword) {
-        this.errorMessage = "The passwords you enter do not match."
+        this.errorMessage = "The passwords you enter do not match!"
         this.error = true;
       } else {
-        alert(this.email + " " + this.password + " " + this.confirmPassword);
+        firebase.auth().createUserWithEmailAndPassword(this.email, this.password)
+          .then(user => {
+            alert("Account created for " + user.user.email);
+            let key = new RSA().generateKeyPair();
+            const new_user = {
+              user_email: user.user.email,
+              groups: [],
+              private_key: key.exportKey("private"),
+              public_key: key.exportKey("public")
+            }
+            db.collection('users').add(new_user).then(() => {
+              this.$router.push('/home');
+            })
+          },
+          err => {
+            this.error = true;
+            this.errorMessage = err.message;
+          })
       }
     }
   }

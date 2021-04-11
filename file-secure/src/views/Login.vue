@@ -57,26 +57,52 @@
             color="#ff59ac"
             style="width: 50%"
             @click="login()"
-        >log in</v-btn>
-        <p class="mb-10 mt-5">Need an account? <a><router-link to="/register">Sign up here!</router-link></a></p>
+        >log in
+        </v-btn>
+        <p class="mb-10 mt-5">Need an account? <a>
+          <router-link to="/register">Sign up here!</router-link>
+        </a></p>
       </v-card>
     </v-row>
+    <v-dialog
+        v-model="error"
+        max-width="600"
+    >
+      <v-card
+          class="pt-10 pb-10 mx-auto text-center"
+          elevation="24"
+      >
+        <h1 class="mb-5">Error!</h1>
+        <p>{{errorMessage}}</p>
+      </v-card>
+    </v-dialog>
   </v-container>
 </template>
 
 <script>
+import firebase from 'firebase';
+
 export default {
-  name: 'LoginCard',
+  name: "Login",
 
   data: () => ({
     show: false,
     email: "",
     password: "",
+    error: false,
+    errorMessage: "",
   }),
 
   methods: {
     login() {
-      alert(this.email + " " + this.password);
+      firebase.auth().signInWithEmailAndPassword(this.email, this.password)
+          .then(() => {
+                this.$router.push('/home');
+              },
+              err => {
+                this.error = true;
+                this.errorMessage = err.message;
+              })
     }
   }
 }
@@ -85,7 +111,7 @@ export default {
 <style>
 a {
   text-decoration: none;
-  color: #ff59ac !important
+  color: #ff59ac !important;
 }
 
 a:hover {

@@ -70,8 +70,11 @@
             color="#ff59ac"
             style="width: 50%"
             @click="register()"
-        >sign up</v-btn>
-        <p class="mb-10 mt-5">Have an account? <a><router-link to="/">Log in here!</router-link></a></p>
+        >sign up
+        </v-btn>
+        <p class="mb-10 mt-5">Have an account? <a>
+          <router-link to="/">Log in here!</router-link>
+        </a></p>
       </v-card>
     </v-row>
     <v-dialog
@@ -83,7 +86,7 @@
           elevation="24"
       >
         <h1 class="mb-5">Error!</h1>
-        <p>{{errorMessage}}</p>
+        <p>{{ errorMessage }}</p>
       </v-card>
     </v-dialog>
   </v-container>
@@ -92,7 +95,7 @@
 <script>
 import firebase from 'firebase';
 import db from '../firebase-init';
-import RSA from 'node-rsa';
+
 export default {
   name: 'Register',
 
@@ -107,28 +110,25 @@ export default {
 
   methods: {
     register() {
-      if(this.password !== this.confirmPassword) {
+      if (this.password !== this.confirmPassword) {
         this.errorMessage = "The passwords you enter do not match!"
         this.error = true;
       } else {
         firebase.auth().createUserWithEmailAndPassword(this.email, this.password)
-          .then(user => {
-            alert("Account created for " + user.user.email);
-            let key = new RSA().generateKeyPair();
-            const new_user = {
-              user_email: user.user.email,
-              groups: [],
-              private_key: key.exportKey("private"),
-              public_key: key.exportKey("public")
-            }
-            db.collection('users').add(new_user).then(() => {
-              this.$router.push('/home');
-            })
-          },
-          err => {
-            this.error = true;
-            this.errorMessage = err.message;
-          })
+            .then(user => {
+                  alert("Account created for " + user.user.email);
+                  const new_user = {
+                    user_email: user.user.email,
+                    groups: [],
+                  }
+                  db.collection('users').add(new_user).then(() => {
+                    this.$router.push('/home');
+                  })
+                },
+                err => {
+                  this.error = true;
+                  this.errorMessage = err.message;
+                })
       }
     }
   }

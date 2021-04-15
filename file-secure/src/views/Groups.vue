@@ -26,12 +26,13 @@
           </v-row>
         </div>
       </v-row>
-      <v-row v-for="name in this.group_names" :key="name">
+      <v-row v-for="_group in this.groups" :key="_group">
         <div
             class="mx-auto mb-3"
             style="width:75%">
-          <v-card class="pa-5">
-            <h4>{{ name }}</h4>
+          <v-card class="pl-5 pt-5 pb-1" @click="goToGroup(_group.id)">
+            <h2>{{ _group.name }}</h2>
+            <p class="subtitle-1 grey--text">{{ _group.members }} members</p>
           </v-card>
         </div>
       </v-row>
@@ -85,7 +86,7 @@ import firebase from 'firebase';
 import db from '../firebase-init'
 
 export default {
-  name: 'Home',
+  name: 'Groups',
   components: {
     Nav
   },
@@ -95,17 +96,20 @@ export default {
     errorMessage: "",
     open: false,
     group: "",
-    group_names: []
+    groups: []
   }),
 
   mounted() {
     this.fetchGroups();
-    console.log(this.group_names);
   },
 
   methods: {
     showDialog() {
       this.open = true;
+    },
+
+    goToGroup(id) {
+      this.$router.push('/group/' + id);
     },
 
     fetchGroups() {
@@ -115,7 +119,7 @@ export default {
           .get()
           .then((querySnapshot) => {
             querySnapshot.forEach((doc) => {
-              this.group_names.push(doc.data().group_name);
+              this.groups.push({name: doc.data().group_name, id: doc.id, members: doc.data().members.length})
             })
           })
     },

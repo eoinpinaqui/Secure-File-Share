@@ -15,8 +15,16 @@ const routes = [
     },
     {
         path: '/groups',
-        name: 'Group',
+        name: 'Groups',
         component: () => import('../views/Groups'),
+        meta: {
+            requiresAuth: true
+        }
+    },
+    {
+        path: '/group/:group_id',
+        name: 'Group',
+        component: () => import('../views/Group'),
         meta: {
             requiresAuth: true
         }

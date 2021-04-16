@@ -18,7 +18,6 @@
           dense
       >
         <v-list-item-group
-            v-model="group"
             active-class="text--accent-4"
         >
           <v-list-item @click="changePage('/home')">

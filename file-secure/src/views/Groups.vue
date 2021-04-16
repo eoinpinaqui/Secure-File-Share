@@ -149,7 +149,8 @@ export default {
               });
             })
             .catch((error) => {
-              alert(error);
+              this.error = true;
+              this.errorMessage = error.message;
             })
 
         db.collection('groups').add(new_group).then(() => {

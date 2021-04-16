@@ -130,19 +130,32 @@
       >
         <v-container>
           <h1 class="mb-5">Members</h1>
+          <v-container style="display: flex; align-items: stretch">
+            <v-text-field
+                placeholder="Add new member"
+                filled
+                v-model="newMember"
+            ></v-text-field>
+            <v-btn
+                class="mx-5"
+                fab
+                dark
+                color=#ff59ac
+                @click="addUser()"
+            >
+              <h1 style="font-weight: 400">+</h1>
+            </v-btn>
+          </v-container>
           <div v-for="_member in this.members" :key="_member">
             <div
                 class="mx-auto mb-3"
                 style="width:75%; display: flex">
               <v-card class="pt-4 pb-1 text-left" style="width:80%">
                 <p>
-                  <v-avatar color="red" class="mx-5">
-                    <span class="white--text headline">{{ _member.charAt(0) }}</span>
-                  </v-avatar>
                   {{ _member }}
                 </p>
               </v-card>
-              <v-icon v-if="currentUser !== _member" class="mx-3">
+              <v-icon v-if="currentUser !== _member" class="mx-3" @click="deleteUser(_member)">
                 mdi-account-remove
               </v-icon>
             </div>
@@ -189,7 +202,8 @@ export default {
     path_to_display: "",
     members_dialog: false,
     members: [],
-    currentUser: ""
+    currentUser: "",
+    newMember: ""
   }),
 
   created() {
@@ -231,6 +245,65 @@ export default {
         res.items.forEach((itemRef) => {
           this.files.push(itemRef.name);
         });
+      }).catch(error => {
+        this.error = true;
+        this.errorMessage = error.message;
+      });
+    },
+
+    addUser() {
+      db.collection("users").where("user_email", "==", this.newMember)
+          .get()
+          .then((querySnapshot) => {
+            let found = false;
+            querySnapshot.forEach(() => {
+              found = true;
+            });
+            if (!found) {
+              this.error = true;
+              this.errorMessage = "A user with this email does not exist.";
+            } else {
+              db.collection("groups").doc(this.group_id).get().then((doc) => {
+                if (doc.exists) {
+                  let data = doc.data();
+                  if (!data.members.includes(this.newMember)) {
+                    let oldMembers = data.members;
+                    oldMembers.push(this.newMember);
+                    db.collection("groups").doc(this.group_id).set({
+                      members: oldMembers
+                    }, {merge: true});
+                    this.members = oldMembers;
+                  } else {
+                    this.error = true;
+                    this.errorMessage = "This user is in the group already!";
+                  }
+                }
+              }).catch(error => {
+                this.error = true;
+                this.errorMessage = error.message;
+              });
+            }
+
+          })
+          .catch((error) => {
+            this.error = true;
+            this.errorMessage = error.message;
+          });
+    },
+
+    deleteUser(member) {
+      db.collection("groups").doc(this.group_id).get().then((doc) => {
+        if (doc.exists) {
+          let data = doc.data();
+          let filtered = data.members.filter(function(value){
+            return value !== member;
+          });
+          db.collection("groups").doc(this.group_id).set({
+            group_name: this.group_name,
+            members: filtered
+          });
+          this.members = filtered;
+        }
       }).catch(error => {
         this.error = true;
         this.errorMessage = error.message;

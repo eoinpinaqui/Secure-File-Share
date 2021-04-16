@@ -133,10 +133,9 @@ export default {
 
         const new_group = {
           group_name: String(this.group),
-          files: [],
           members: [user.email]
         }
-
+        this.groups = [];
         db.collection("users").where("user_email", "==", user.email)
             .get()
             .then((querySnapshot) => {

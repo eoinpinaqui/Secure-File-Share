@@ -1,11 +1,11 @@
 <template>
   <div class="nav">
     <v-app-bar
-      color=#ff59ac
-      dark
+        color=#ff59ac
+        dark
     >
-      <v-app-bar-nav-icon @click="drawer = true"></v-app-bar-nav-icon>
-      <h2 class="ml-10">File <span class="font-weight-thin">Secure</span></h2>
+        <v-app-bar-nav-icon @click="drawer = true"></v-app-bar-nav-icon>
+        <h2 class="ml-10" @click="goHome()">File <span class="font-weight-thin">Secure</span></h2>
     </v-app-bar>
 
     <v-navigation-drawer
@@ -48,6 +48,7 @@
 
 <script>
 import firebase from 'firebase';
+
 export default {
   name: 'Nav',
   data: () => ({
@@ -57,8 +58,12 @@ export default {
   methods: {
     logout() {
       firebase.auth().signOut().then(() => {
-            this.$router.push('/');
+        this.$router.push('/');
       });
+    },
+
+    goHome() {
+      this.$router.push("/home");
     },
 
     changePage(page) {

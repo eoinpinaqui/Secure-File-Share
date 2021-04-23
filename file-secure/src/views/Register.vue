@@ -95,6 +95,7 @@
 <script>
 import firebase from 'firebase';
 import db from '../firebase-init';
+import { RSA } from 'hybrid-crypto-js';
 
 export default {
   name: 'Register',
@@ -109,6 +110,21 @@ export default {
   }),
 
   methods: {
+    addUser(keyPair) {
+      // Callback function receives new key pair as a first argument
+      const publicKey = keyPair.publicKey;
+      const privateKey = keyPair.privateKey;
+      const new_user = {
+        user_email: this.email,
+        groups: [],
+        public_key: publicKey,
+        private_key: privateKey
+      }
+      db.collection('users').add(new_user).then(() => {
+        this.$router.push("/home");
+      })
+    },
+
     register() {
       if (this.password !== this.confirmPassword) {
         this.errorMessage = "The passwords you enter do not match!"
@@ -117,13 +133,11 @@ export default {
         firebase.auth().createUserWithEmailAndPassword(this.email, this.password)
             .then(user => {
                   alert("Account created for " + user.user.email);
-                  const new_user = {
-                    user_email: user.user.email,
-                    groups: [],
-                  }
-                  db.collection('users').add(new_user).then(() => {
-                    this.$router.push('/home');
-                  })
+                  // Initialize RSA-class
+                  const rsa = new RSA();
+
+                  // Generate RSA key pair, default key size is 4096 bit
+                  rsa.generateKeyPair(this.addUser);
                 },
                 err => {
                   this.error = true;

@@ -182,6 +182,7 @@
 import Nav from "../components/navbar.vue";
 import db from '../firebase-init';
 import firebase from "firebase";
+import { Crypt } from "hybrid-crypto-js";
 
 export default {
   name: 'Group',
@@ -283,7 +284,6 @@ export default {
                 this.errorMessage = error.message;
               });
             }
-
           })
           .catch((error) => {
             this.error = true;
@@ -295,7 +295,7 @@ export default {
       db.collection("groups").doc(this.group_id).get().then((doc) => {
         if (doc.exists) {
           let data = doc.data();
-          let filtered = data.members.filter(function(value){
+          let filtered = data.members.filter(function (value) {
             return value !== member;
           });
           db.collection("groups").doc(this.group_id).set({
@@ -337,23 +337,28 @@ export default {
     upload() {
       if (this.myFile && this.myFile.name) {
         this.processing = true;
-        const fr = new FileReader();
-        fr.readAsDataURL(this.myFile);
-        const data = new FormData();
-        data.append("file", this.myFile);
-        const filePath = `${this.current_path}/${this.myFile.name}`;
-        const metadata = {contentType: this.myFile.type};
-        firebase.storage().ref()
-            .child(filePath)
-            .put(this.myFile, metadata)
-            .then(() => {
-              this.processing = false;
-              this.fetchFiles(this.current_path);
-            }, error => {
-              this.error = true;
-              this.errorMessage = error.message;
-            });
+        db.collection("groups").doc(this.group_id).get().then((doc) => {
+          let data = doc.data();
+          let public_key = data.public_key;
+          const filePath = `${this.current_path}/${this.myFile.name}`;
+          const fr = new FileReader();
+          fr.onload = function(event) {
+            let contents = event.target.result;
+            const crypt = new Crypt();
+            let encrypted = crypt.encrypt(public_key, contents);
+            firebase.storage().ref()
+                .child(filePath)
+                .putString(String(encrypted)).then(() => {});
+          }
+          fr.readAsDataURL(this.myFile);
+          setTimeout(this.fetch, 3000);
+        })
       }
+    },
+
+    fetch() {
+      this.processing = false;
+      this.fetchFiles(this.current_path);
     },
 
     delete_file(file) {
@@ -368,14 +373,60 @@ export default {
     },
 
     download(file) {
-      firebase.storage().ref().child((this.current_path + "/" + file)).getDownloadURL()
+      db.collection("groups").doc(this.group_id).get().then((doc) => {
+        let data = doc.data();
+        let private_key = data.private_key;
+
+        firebase.storage().ref().child((this.current_path + "/" + file)).getDownloadURL()
           .then((url) => {
-            window.open(url);
+            let xhr = new XMLHttpRequest();
+            xhr.responseType = 'blob';
+            xhr.onload = () => {
+              let blob = xhr.response;
+              const fr = new FileReader();
+              fr.onload = function (event)  {
+                const text = event.target.result;
+                const crypt = new Crypt();
+                let decrypted = crypt.decrypt(private_key, atob(text.split(",")[1]));
+                console.log(atob(decrypted.message.split(",")[1]));
+              };
+              fr.readAsDataURL(blob);
+            };
+            xhr.open('GET', url);
+            xhr.send();
           })
-          .catch((error) => {
-            this.error = true;
-            this.errorMessage = error.message;
-          })
+
+      })
+
+      /*
+      db.collection("groups").doc(this.group_id).get().then((doc) => {
+        let data = doc.data()
+        let key = data.key;
+
+        firebase.storage().ref().child((this.current_path + "/" + file)).getDownloadURL()
+            .then((url) => {
+              let xhr = new XMLHttpRequest();
+              xhr.responseType = 'blob';
+              xhr.onload = () => {
+                let blob = xhr.response;
+                const fr = new FileReader();
+                fr.onload = function (event)  {
+                  const text = event.target.result;
+                  let decrypted = key.decrypt(text, "base64");
+                  console.log(decrypted);
+                };
+                fr.readAsDataURL(blob);
+              };
+              xhr.open('GET', url);
+              xhr.send();
+            })
+            .catch((error) => {
+              this.error = true;
+              this.errorMessage = error.message;
+            })
+      })
+
+       */
     }
   }
 }

@@ -83,7 +83,8 @@
 <script>
 import Nav from "../components/navbar.vue";
 import firebase from 'firebase';
-import db from '../firebase-init'
+import db from '../firebase-init';
+import { RSA } from 'hybrid-crypto-js';
 
 export default {
   name: 'Groups',
@@ -129,34 +130,40 @@ export default {
         this.error = true;
         this.errorMessage = "The Group name cannot be blank!";
       } else {
-        let user = firebase.auth().currentUser;
-
-        const new_group = {
-          group_name: String(this.group),
-          members: [user.email]
-        }
-        this.groups = [];
-        db.collection("users").where("user_email", "==", user.email)
-            .get()
-            .then((querySnapshot) => {
-              querySnapshot.forEach((doc) => {
-                let groups = doc.data().groups;
-                groups.push(String(this.group));
-                db.collection("users").doc(doc.id).update({
-                  "groups": groups
-                })
-              });
-            })
-            .catch((error) => {
-              this.error = true;
-              this.errorMessage = error.message;
-            })
-
-        db.collection('groups').add(new_group).then(() => {
-          this.open = false;
-          this.fetchGroups();
-        })
+        alert("Im in");
+        const rsa = new RSA();
+        rsa.generateKeyPair(this.addGroups);
       }
+    },
+    addGroups(keyPair) {
+      let user = firebase.auth().currentUser;
+      const new_group = {
+        group_name: String(this.group),
+        members: [user.email],
+        owner: user.email,
+        private_key: keyPair.privateKey,
+        public_key: keyPair.publicKey
+      }
+      this.groups = [];
+      db.collection("users").where("user_email", "==", user.email)
+          .get()
+          .then((querySnapshot) => {
+            querySnapshot.forEach((doc) => {
+              let groups = doc.data().groups;
+              groups.push(String(this.group));
+              db.collection("users").doc(doc.id).update({
+                "groups": groups
+              })
+            });
+          })
+          .catch((error) => {
+            this.error = true;
+            this.errorMessage = error.message;
+          })
+      db.collection('groups').add(new_group).then(() => {
+        this.open = false;
+        this.fetchGroups();
+      })
     }
   }
 }

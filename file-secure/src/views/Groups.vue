@@ -131,8 +131,6 @@ export default {
         this.error = true;
         this.errorMessage = "The Group name cannot be blank!";
       } else {
-        console.log(sessionStorage.getItem("password"));
-        alert(sessionStorage.getItem("password"));
         const rsa = new RSA();
         rsa.generateKeyPair(this.addGroups);
       }
@@ -156,11 +154,9 @@ export default {
             .then((querySnapshot) => {
               querySnapshot.forEach((doc) => {
                 let data = doc.data();
-                let groups = data.groups;
                 const crypt = new Crypt();
                 let encrypted = crypt.encrypt(data.public_key, String(privateKey));
                 db.collection("users").doc(doc.id).update({
-                  "groups": groups,
                   [docRef.id]: String(encrypted),
                 })
               });

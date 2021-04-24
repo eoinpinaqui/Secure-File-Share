@@ -255,6 +255,7 @@ export default {
     },
 
     addUser() {
+      // Get the current user
       let user = firebase.auth().currentUser;
       let found = false;
       db.collection("users").where("user_email", "==", this.newMember)
@@ -266,16 +267,22 @@ export default {
                       (querySnapshot1) => {
                         querySnapshot1.forEach((doc) => {
                           let data = doc.data();
+                          // Extract the users private key
                           let privateKey = data.private_key;
                           let password = sessionStorage.getItem("password");
+
+                          // Decrypt the users private key using their password
                           let bytes = CryptoJS.AES.decrypt(privateKey, password);
                           let users_private_key = bytes.toString(CryptoJS.enc.Utf8);
                           let groupPrivateKey = data[this.group_id];
+
+                          // Decrypt the groups private key using the users private key and rencrypt it using the new users
+                          // public key
                           const crypt = new Crypt();
                           let unencryptedKey = crypt.decrypt(users_private_key, groupPrivateKey);
-                          console.log(unencryptedKey);
                           let decryptedKey = crypt.encrypt(newUser.data().public_key, unencryptedKey.message);
-                          console.log(decryptedKey);
+
+                          // Add the encrypted group private key to the new users document
                           db.collection("users").doc(newUser.id).update({
                             [this.group_id]: String(decryptedKey),
                           })
@@ -314,12 +321,14 @@ export default {
           .get()
           .then((querySnapshot) => {
             querySnapshot.forEach((doc) => {
+              // Delete the groups private key from the users document
               doc.ref.update({
                 [this.group_id]: firebase.firestore.FieldValue.delete()
               })
             })
           })
       db.collection("groups").doc(this.group_id).get().then((doc) => {
+        // Remove the user from the groups document
         if (doc.exists) {
           let data = doc.data();
           let filtered = data.members.filter(function (value) {
@@ -335,8 +344,7 @@ export default {
         this.error = true;
         this.errorMessage = error.message;
       });
-    }
-    ,
+    },
 
     goToFolder(folder) {
       if (this.path_to_display === "/") {
@@ -346,8 +354,7 @@ export default {
       }
       this.current_path = this.group_id + this.path_to_display;
       this.fetchFiles(this.current_path);
-    }
-    ,
+    },
 
     moveBack() {
       if (this.path_to_display === "/") {
@@ -361,38 +368,59 @@ export default {
         this.current_path = this.group_id + "/" + this.path_to_display;
         this.fetchFiles(this.current_path);
       }
-    }
-    ,
+    },
 
     upload() {
+      let user = firebase.auth().currentUser;
       if (this.myFile && this.myFile.name) {
         this.processing = true;
         db.collection("groups").doc(this.group_id).get().then((doc) => {
           let data = doc.data();
           let public_key = data.public_key;
-          const filePath = `${this.current_path}/${this.myFile.name}`;
-          const fr = new FileReader();
-          fr.onload = function (event) {
-            let contents = event.target.result;
-            const crypt = new Crypt();
-            let encrypted = crypt.encrypt(public_key, contents);
-            firebase.storage().ref()
-                .child(filePath)
-                .putString(String(encrypted)).then(() => {
-            });
-          }
-          fr.readAsDataURL(this.myFile);
-          setTimeout(this.fetch, 3000);
+          db.collection("users").where("user_email", "==", user.email)
+              .get()
+              .then((querySnapshot) => {
+                querySnapshot.forEach((doc) => {
+                  // Get the current users encrypted private key
+                  let data = doc.data();
+                  let privateKey = data.private_key;
+
+                  // Decrypt the users private key using their password
+                  let password = sessionStorage.getItem("password");
+                  let bytes = CryptoJS.AES.decrypt(privateKey, password);
+                  let users_private_key = bytes.toString(CryptoJS.enc.Utf8);
+
+                  // Decrypt the group private key and use it to sign the encryption of the file
+                  let groupPrivateKey = data[this.group_id];
+                  const crypt = new Crypt();
+                  let unencryptedKey = crypt.decrypt(users_private_key, groupPrivateKey);
+                  const filePath = `${this.current_path}/${this.myFile.name}`;
+                  const fr = new FileReader();
+
+                  // Encrypt the file with a signature and upload it
+                  fr.onload = function (event) {
+                    let contents = event.target.result;
+                    const crypt = new Crypt();
+                    let signature = crypt.signature(unencryptedKey.message, contents);
+                    let encrypted = crypt.encrypt(public_key, contents, signature);
+                    console.log(encrypted);
+                    firebase.storage().ref()
+                        .child(filePath)
+                        .putString(String(encrypted)).then(() => {
+                    });
+                  }
+                  fr.readAsDataURL(this.myFile);
+                  setTimeout(this.fetch, 3000);
+                })
+              })
         })
       }
-    }
-    ,
+    },
 
     fetch() {
       this.processing = false;
       this.fetchFiles(this.current_path);
-    }
-    ,
+    },
 
     delete_file(file) {
       firebase.storage().ref().child((this.current_path + "/" + file)).delete()
@@ -407,32 +435,54 @@ export default {
 
     download(file) {
       let user = firebase.auth().currentUser;
+      let public_key = "";
+      db.collection("groups").doc(this.group_id).get().then((doc) => {
+        let data = doc.data();
+        public_key = data.public_key;
+      })
       db.collection("users").where("user_email", "==", user.email)
           .get()
           .then((querySnapshot) => {
             querySnapshot.forEach((doc) => {
+              // Get the users private key
               let data = doc.data();
               let privateKey = data.private_key;
+
+              // Decrypt the users private key using their password
               let password = sessionStorage.getItem("password");
               let bytes = CryptoJS.AES.decrypt(privateKey, password);
               let users_private_key = bytes.toString(CryptoJS.enc.Utf8);
+
+              // Decrypt the groups private key
               let groupPrivateKey = data[this.group_id];
               const crypt = new Crypt();
               let unencryptedKey = crypt.decrypt(users_private_key, groupPrivateKey);
               firebase.storage().ref().child((this.current_path + "/" + file)).getDownloadURL()
                   .then((url) => {
+                    // Download the encrypted file
                     let xhr = new XMLHttpRequest();
                     xhr.responseType = 'blob';
                     xhr.onload = () => {
                       let blob = xhr.response;
                       const fr = new FileReader();
                       fr.onload = function (event) {
+                        // Decrypt the file
                         const text = event.target.result;
                         const crypt = new Crypt();
                         let decrypted = crypt.decrypt(unencryptedKey.message, atob(text.split(",")[1]));
-                        let stringResponse = atob(decrypted.message.split(",")[1]);
-                        console.log(stringResponse);
-                        fileDownload(stringResponse, file);
+
+                        // Verify the signature
+                        let verified = crypt.verify(
+                            public_key,
+                            decrypted.signature,
+                            decrypted.message,
+                        );
+                        if(!verified) {
+                          alert("The signature was wrong");
+                        } else {
+                          let stringResponse = atob(decrypted.message.split(",")[1]);
+                          fileDownload(stringResponse, file);
+                        }
                       };
                       fr.readAsDataURL(blob);
                     };

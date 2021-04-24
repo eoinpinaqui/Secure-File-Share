@@ -112,7 +112,7 @@ export default {
 
   methods: {
     addUser(keyPair) {
-      // Callback function receives new key pair as a first argument
+      // Encypt the private key and store with the user document
       const publicKey = keyPair.publicKey;
       const privateKey = keyPair.privateKey;
       let encrypted_private_key = CryptoJS.AES.encrypt(String(privateKey), this.password).toString();

@@ -184,6 +184,7 @@ import db from '../firebase-init';
 import firebase from "firebase";
 import {Crypt} from "hybrid-crypto-js";
 import fileDownload from "js-file-download";
+import CryptoJS from "crypto-js";
 
 export default {
   name: 'Group',
@@ -266,9 +267,12 @@ export default {
                         querySnapshot1.forEach((doc) => {
                           let data = doc.data();
                           let privateKey = data.private_key;
+                          let password = sessionStorage.getItem("password");
+                          let bytes = CryptoJS.AES.decrypt(privateKey, password);
+                          let users_private_key = bytes.toString(CryptoJS.enc.Utf8);
                           let groupPrivateKey = data[this.group_id];
                           const crypt = new Crypt();
-                          let unencryptedKey = crypt.decrypt(privateKey, groupPrivateKey);
+                          let unencryptedKey = crypt.decrypt(users_private_key, groupPrivateKey);
                           console.log(unencryptedKey);
                           let decryptedKey = crypt.encrypt(newUser.data().public_key, unencryptedKey.message);
                           console.log(decryptedKey);
@@ -399,8 +403,7 @@ export default {
             this.error = true;
             this.errorMessage = error.message;
           });
-    }
-    ,
+    },
 
     download(file) {
       let user = firebase.auth().currentUser;
@@ -410,9 +413,12 @@ export default {
             querySnapshot.forEach((doc) => {
               let data = doc.data();
               let privateKey = data.private_key;
+              let password = sessionStorage.getItem("password");
+              let bytes = CryptoJS.AES.decrypt(privateKey, password);
+              let users_private_key = bytes.toString(CryptoJS.enc.Utf8);
               let groupPrivateKey = data[this.group_id];
               const crypt = new Crypt();
-              let unencryptedKey = crypt.decrypt(privateKey, groupPrivateKey);
+              let unencryptedKey = crypt.decrypt(users_private_key, groupPrivateKey);
               firebase.storage().ref().child((this.current_path + "/" + file)).getDownloadURL()
                   .then((url) => {
                     let xhr = new XMLHttpRequest();

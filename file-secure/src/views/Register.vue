@@ -96,6 +96,7 @@
 import firebase from 'firebase';
 import db from '../firebase-init';
 import { RSA } from 'hybrid-crypto-js';
+import CryptoJS from "crypto-js";
 
 export default {
   name: 'Register',
@@ -114,11 +115,12 @@ export default {
       // Callback function receives new key pair as a first argument
       const publicKey = keyPair.publicKey;
       const privateKey = keyPair.privateKey;
+      let encrypted_private_key = CryptoJS.AES.encrypt(String(privateKey), this.password).toString();
       const new_user = {
         user_email: this.email,
         groups: [],
         public_key: publicKey,
-        private_key: privateKey
+        private_key: encrypted_private_key
       }
       db.collection('users').add(new_user).then(() => {
         this.$router.push("/home");
@@ -132,6 +134,7 @@ export default {
       } else {
         firebase.auth().createUserWithEmailAndPassword(this.email, this.password)
             .then(user => {
+              sessionStorage.setItem("password", this.password);
                   alert("Account created for " + user.user.email);
                   // Initialize RSA-class
                   const rsa = new RSA();

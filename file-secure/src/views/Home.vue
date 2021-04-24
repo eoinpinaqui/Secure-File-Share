@@ -27,10 +27,11 @@
         <v-row>
           <p class="mx-auto" style="max-width: 50%">The aim of this project is provide users with a secure cloud storage
             application like Dropbox, Box, Google Drive, Office365 etc. For example, this application will secure all
-            files that are uploaded to the cloud, such that only  people  that  are  part  of  your  “Secure  Cloud
-            Storage Group”  will  be  able  to  decrypt uploaded files. Any member of the group is able to
+            files that are uploaded to the cloud, such that only people that are part of your “Secure Cloud
+            Storage Group” will be able to decrypt uploaded files. Any member of the group is able to
             upload encrypted files to the cloud service. To all other users the files will be encrypted. This service
-            uses a suitable key management system which employs public-key certificates that allows users of the system to share
+            uses a suitable key management system which employs public-key certificates that allows users of the system
+            to share
             files securely, and also allows one to add or remove users from the group.</p>
         </v-row>
       </div>

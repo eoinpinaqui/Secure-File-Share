@@ -131,6 +131,8 @@ export default {
         this.error = true;
         this.errorMessage = "The Group name cannot be blank!";
       } else {
+        console.log(sessionStorage.getItem("password"));
+        alert(sessionStorage.getItem("password"));
         const rsa = new RSA();
         rsa.generateKeyPair(this.addGroups);
       }

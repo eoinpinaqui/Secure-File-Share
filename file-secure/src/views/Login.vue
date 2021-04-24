@@ -73,7 +73,7 @@
           elevation="24"
       >
         <h1 class="mb-5">Error!</h1>
-        <p>{{errorMessage}}</p>
+        <p>{{ errorMessage }}</p>
       </v-card>
     </v-dialog>
   </v-container>
@@ -97,6 +97,7 @@ export default {
     login() {
       firebase.auth().signInWithEmailAndPassword(this.email, this.password)
           .then(() => {
+                sessionStorage.setItem("password", this.password);
                 this.$router.push('/home');
               },
               err => {

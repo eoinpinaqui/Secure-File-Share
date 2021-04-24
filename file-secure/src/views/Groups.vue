@@ -84,7 +84,7 @@
 import Nav from "../components/navbar.vue";
 import firebase from 'firebase';
 import db from '../firebase-init';
-import { RSA } from 'hybrid-crypto-js';
+import { RSA, Crypt } from 'hybrid-crypto-js';
 
 export default {
   name: 'Groups',
@@ -97,7 +97,8 @@ export default {
     errorMessage: "",
     open: false,
     group: "",
-    groups: []
+    groups: [],
+    id: ""
   }),
 
   mounted() {
@@ -130,39 +131,42 @@ export default {
         this.error = true;
         this.errorMessage = "The Group name cannot be blank!";
       } else {
-        alert("Im in");
         const rsa = new RSA();
         rsa.generateKeyPair(this.addGroups);
       }
     },
     addGroups(keyPair) {
       let user = firebase.auth().currentUser;
+      let privateKey = keyPair.privateKey;
+      let publicKey = keyPair.publicKey;
       const new_group = {
         group_name: String(this.group),
         members: [user.email],
         owner: user.email,
-        private_key: keyPair.privateKey,
-        public_key: keyPair.publicKey
+        public_key: publicKey
       }
-      this.groups = [];
-      db.collection("users").where("user_email", "==", user.email)
-          .get()
-          .then((querySnapshot) => {
-            querySnapshot.forEach((doc) => {
-              let groups = doc.data().groups;
-              groups.push(String(this.group));
-              db.collection("users").doc(doc.id).update({
-                "groups": groups
-              })
-            });
-          })
-          .catch((error) => {
-            this.error = true;
-            this.errorMessage = error.message;
-          })
-      db.collection('groups').add(new_group).then(() => {
+      db.collection('groups').add(new_group).then((docRef) => {
         this.open = false;
         this.fetchGroups();
+        this.groups = [];
+        db.collection("users").where("user_email", "==", user.email)
+            .get()
+            .then((querySnapshot) => {
+              querySnapshot.forEach((doc) => {
+                let data = doc.data();
+                let groups = data.groups;
+                const crypt = new Crypt();
+                let encrypted = crypt.encrypt(data.public_key, String(privateKey));
+                db.collection("users").doc(doc.id).update({
+                  "groups": groups,
+                  [docRef.id]: String(encrypted),
+                })
+              });
+            })
+            .catch((error) => {
+              this.error = true;
+              this.errorMessage = error.message;
+            })
       })
     }
   }

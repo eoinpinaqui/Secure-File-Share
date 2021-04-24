@@ -182,7 +182,8 @@
 import Nav from "../components/navbar.vue";
 import db from '../firebase-init';
 import firebase from "firebase";
-import { Crypt } from "hybrid-crypto-js";
+import {Crypt} from "hybrid-crypto-js";
+import fileDownload from "js-file-download";
 
 export default {
   name: 'Group',
@@ -253,37 +254,50 @@ export default {
     },
 
     addUser() {
+      let user = firebase.auth().currentUser;
+      let found = false;
       db.collection("users").where("user_email", "==", this.newMember)
           .get()
           .then((querySnapshot) => {
-            let found = false;
-            querySnapshot.forEach(() => {
-              found = true;
-            });
-            if (!found) {
-              this.error = true;
-              this.errorMessage = "A user with this email does not exist.";
-            } else {
-              db.collection("groups").doc(this.group_id).get().then((doc) => {
-                if (doc.exists) {
-                  let data = doc.data();
-                  if (!data.members.includes(this.newMember)) {
-                    let oldMembers = data.members;
-                    oldMembers.push(this.newMember);
-                    db.collection("groups").doc(this.group_id).set({
-                      members: oldMembers
-                    }, {merge: true});
-                    this.members = oldMembers;
-                  } else {
+            querySnapshot.forEach((newUser) => {
+                  found = true;
+                  db.collection("users").where("user_email", "==", user.email).get().then(
+                      (querySnapshot1) => {
+                        querySnapshot1.forEach((doc) => {
+                          let data = doc.data();
+                          let privateKey = data.private_key;
+                          let groupPrivateKey = data[this.group_id];
+                          const crypt = new Crypt();
+                          let unencryptedKey = crypt.decrypt(privateKey, groupPrivateKey);
+                          console.log(unencryptedKey);
+                          let decryptedKey = crypt.encrypt(newUser.data().public_key, unencryptedKey.message);
+                          console.log(decryptedKey);
+                          db.collection("users").doc(newUser.id).update({
+                            [this.group_id]: String(decryptedKey),
+                          })
+                        });
+                      })
+                  if (!found) {
                     this.error = true;
-                    this.errorMessage = "This user is in the group already!";
+                    this.errorMessage = "A user with this email does not exist.";
+                  } else {
+                    db.collection("groups").doc(this.group_id).get().then((doc) => {
+                      let data = doc.data();
+                      if (!data.members.includes(this.newMember)) {
+                        let oldMembers = data.members;
+                        oldMembers.push(this.newMember);
+                        db.collection("groups").doc(this.group_id).set({
+                          members: oldMembers
+                        }, {merge: true});
+                        this.members = oldMembers;
+                      } else {
+                        this.error = true;
+                        this.errorMessage = "This user is in the group already!";
+                      }
+                    })
                   }
                 }
-              }).catch(error => {
-                this.error = true;
-                this.errorMessage = error.message;
-              });
-            }
+            )
           })
           .catch((error) => {
             this.error = true;
@@ -292,6 +306,15 @@ export default {
     },
 
     deleteUser(member) {
+      db.collection("users").where("user_email", "==", member)
+          .get()
+          .then((querySnapshot) => {
+            querySnapshot.forEach((doc) => {
+              doc.ref.update({
+                [this.group_id]: firebase.firestore.FieldValue.delete()
+              })
+            })
+          })
       db.collection("groups").doc(this.group_id).get().then((doc) => {
         if (doc.exists) {
           let data = doc.data();
@@ -301,14 +324,15 @@ export default {
           db.collection("groups").doc(this.group_id).set({
             group_name: this.group_name,
             members: filtered
-          });
+          }, {merge: true});
           this.members = filtered;
         }
       }).catch(error => {
         this.error = true;
         this.errorMessage = error.message;
       });
-    },
+    }
+    ,
 
     goToFolder(folder) {
       if (this.path_to_display === "/") {
@@ -318,7 +342,8 @@ export default {
       }
       this.current_path = this.group_id + this.path_to_display;
       this.fetchFiles(this.current_path);
-    },
+    }
+    ,
 
     moveBack() {
       if (this.path_to_display === "/") {
@@ -332,7 +357,8 @@ export default {
         this.current_path = this.group_id + "/" + this.path_to_display;
         this.fetchFiles(this.current_path);
       }
-    },
+    }
+    ,
 
     upload() {
       if (this.myFile && this.myFile.name) {
@@ -342,24 +368,27 @@ export default {
           let public_key = data.public_key;
           const filePath = `${this.current_path}/${this.myFile.name}`;
           const fr = new FileReader();
-          fr.onload = function(event) {
+          fr.onload = function (event) {
             let contents = event.target.result;
             const crypt = new Crypt();
             let encrypted = crypt.encrypt(public_key, contents);
             firebase.storage().ref()
                 .child(filePath)
-                .putString(String(encrypted)).then(() => {});
+                .putString(String(encrypted)).then(() => {
+            });
           }
           fr.readAsDataURL(this.myFile);
           setTimeout(this.fetch, 3000);
         })
       }
-    },
+    }
+    ,
 
     fetch() {
       this.processing = false;
       this.fetchFiles(this.current_path);
-    },
+    }
+    ,
 
     delete_file(file) {
       firebase.storage().ref().child((this.current_path + "/" + file)).delete()
@@ -370,63 +399,42 @@ export default {
             this.error = true;
             this.errorMessage = error.message;
           });
-    },
+    }
+    ,
 
     download(file) {
-      db.collection("groups").doc(this.group_id).get().then((doc) => {
-        let data = doc.data();
-        let private_key = data.private_key;
-
-        firebase.storage().ref().child((this.current_path + "/" + file)).getDownloadURL()
-          .then((url) => {
-            let xhr = new XMLHttpRequest();
-            xhr.responseType = 'blob';
-            xhr.onload = () => {
-              let blob = xhr.response;
-              const fr = new FileReader();
-              fr.onload = function (event)  {
-                const text = event.target.result;
-                const crypt = new Crypt();
-                let decrypted = crypt.decrypt(private_key, atob(text.split(",")[1]));
-                console.log(atob(decrypted.message.split(",")[1]));
-              };
-              fr.readAsDataURL(blob);
-            };
-            xhr.open('GET', url);
-            xhr.send();
+      let user = firebase.auth().currentUser;
+      db.collection("users").where("user_email", "==", user.email)
+          .get()
+          .then((querySnapshot) => {
+            querySnapshot.forEach((doc) => {
+              let data = doc.data();
+              let privateKey = data.private_key;
+              let groupPrivateKey = data[this.group_id];
+              const crypt = new Crypt();
+              let unencryptedKey = crypt.decrypt(privateKey, groupPrivateKey);
+              firebase.storage().ref().child((this.current_path + "/" + file)).getDownloadURL()
+                  .then((url) => {
+                    let xhr = new XMLHttpRequest();
+                    xhr.responseType = 'blob';
+                    xhr.onload = () => {
+                      let blob = xhr.response;
+                      const fr = new FileReader();
+                      fr.onload = function (event) {
+                        const text = event.target.result;
+                        const crypt = new Crypt();
+                        let decrypted = crypt.decrypt(unencryptedKey.message, atob(text.split(",")[1]));
+                        let stringResponse = atob(decrypted.message.split(",")[1]);
+                        console.log(stringResponse);
+                        fileDownload(stringResponse, file);
+                      };
+                      fr.readAsDataURL(blob);
+                    };
+                    xhr.open('GET', url);
+                    xhr.send();
+                  })
+            })
           })
-
-      })
-
-      /*
-      db.collection("groups").doc(this.group_id).get().then((doc) => {
-        let data = doc.data()
-        let key = data.key;
-
-        firebase.storage().ref().child((this.current_path + "/" + file)).getDownloadURL()
-            .then((url) => {
-              let xhr = new XMLHttpRequest();
-              xhr.responseType = 'blob';
-              xhr.onload = () => {
-                let blob = xhr.response;
-                const fr = new FileReader();
-                fr.onload = function (event)  {
-                  const text = event.target.result;
-                  let decrypted = key.decrypt(text, "base64");
-                  console.log(decrypted);
-                };
-                fr.readAsDataURL(blob);
-              };
-              xhr.open('GET', url);
-              xhr.send();
-            })
-            .catch((error) => {
-              this.error = true;
-              this.errorMessage = error.message;
-            })
-      })
-
-       */
     }
   }
 }
